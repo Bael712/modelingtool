@@ -25,7 +25,7 @@ renderer.domElement.addEventListener("pointerdown",(e)=>{
     ly = e.clientY;
 });
 
-window.addEventListener("pointerup",()=> drag=false);
+window.addEventListener("pointerup",()=>drag=false);
 
 window.addEventListener("pointermove",(e)=>{
     if(!drag) return;

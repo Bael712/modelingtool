@@ -1,58 +1,51 @@
 import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.160/build/three.module.js";
 import { scene, parts } from "./scene.js";
 
-/* =========================
-   STATE
-========================= */
-
 let selected = null;
 let currentGroup = null;
-
 const groups = [];
 
 /* =========================
-   UI
+   UI SAFE BIND
 ========================= */
 
-const addBtn = document.getElementById("add");
-const type = document.getElementById("type");
+const get = (id)=>document.getElementById(id);
 
-const newGroupBtn = document.getElementById("newGroup");
-const endGroupBtn = document.getElementById("endGroup");
+/* 必須UI */
+const addBtn = get("add");
+const type = get("type");
+const newGroupBtn = get("newGroup");
+const endGroupBtn = get("endGroup");
+const saveBtn = get("save");
+const loadInput = get("load");
+const hierarchy = get("hierarchy");
 
-const saveBtn = document.getElementById("save");
-const loadInput = document.getElementById("load");
-
-const hierarchy = document.getElementById("hierarchy");
-
-const sx = document.getElementById("sx");
-const sy = document.getElementById("sy");
-const sz = document.getElementById("sz");
+const sx = get("sx");
+const sy = get("sy");
+const sz = get("sz");
 
 /* =========================
    GROUP
 ========================= */
 
 function newGroup(){
+    const g = {
+        name:"Group_" + (groups.length+1),
+        objects:[]
+    };
 
-const g = {
-    name:"Group_" + (groups.length+1),
-    objects:[]
-};
+    groups.push(g);
+    currentGroup = g;
 
-groups.push(g);
-currentGroup = g;
-
-renderHierarchy();
-
+    renderHierarchy();
 }
 
 function endGroup(){
-currentGroup = null;
+    currentGroup = null;
 }
 
 /* =========================
-   GEOMETRY
+   GEO
 ========================= */
 
 function geo(t){
@@ -61,8 +54,6 @@ if(t==="box") return new THREE.BoxGeometry(1,1,1);
 if(t==="sphere") return new THREE.SphereGeometry(0.7,32,32);
 if(t==="cylinder") return new THREE.CylinderGeometry(0.5,0.5,1.5,32);
 if(t==="cone") return new THREE.ConeGeometry(0.7,1.5,32);
-if(t==="torus") return new THREE.TorusGeometry(0.6,0.2,16,100);
-if(t==="capsule") return new THREE.CapsuleGeometry(0.5,1,4,8);
 
 return new THREE.BoxGeometry(1,1,1);
 
@@ -76,12 +67,12 @@ function addPart(){
 
 const mesh = new THREE.Mesh(
     geo(type.value),
-    new THREE.MeshStandardMaterial({
-        color:0x00ffff
-    })
+    new THREE.MeshStandardMaterial({ color:0x00ffff })
 );
 
 mesh.position.y = 0.5;
+
+mesh.userData.type = type.value;
 
 scene.add(mesh);
 parts.push(mesh);
@@ -92,12 +83,10 @@ if(currentGroup){
 
 renderHierarchy();
 
-select(parts.length-1);
-
 }
 
 /* =========================
-   SELECT
+   SELECT SAFE
 ========================= */
 
 function select(obj){
@@ -123,30 +112,7 @@ selected.scale.set(
 sx.oninput = sy.oninput = sz.oninput = updateScale;
 
 /* =========================
-   DUPLICATE
-========================= */
-
-document.getElementById("dup").onclick = ()=>{
-
-if(!selected) return;
-
-const m = new THREE.Mesh(
-    selected.geometry,
-    selected.material.clone()
-);
-
-m.position.copy(selected.position);
-m.position.x += 1;
-
-scene.add(m);
-parts.push(m);
-
-select(m);
-
-};
-
-/* =========================
-   DELETE
+   DELETE SAFE
 ========================= */
 
 window.addEventListener("keydown",(e)=>{
@@ -155,19 +121,20 @@ if(!selected) return;
 
 if(e.key==="Delete"){
 
-selected.parent.remove(selected);
-parts.splice(parts.indexOf(selected),1);
+    selected.parent.remove(selected);
 
-selected = null;
+    const idx = parts.indexOf(selected);
+    if(idx >= 0) parts.splice(idx,1);
 
-renderHierarchy();
+    selected = null;
 
+    renderHierarchy();
 }
 
 });
 
 /* =========================
-   SAVE
+   SAVE SAFE
 ========================= */
 
 function serialize(obj){
@@ -213,8 +180,10 @@ URL.revokeObjectURL(url);
 };
 
 /* =========================
-   LOAD
+   LOAD SAFE FIX（ここが重要）
 ========================= */
+
+if(loadInput){
 
 loadInput.onchange = (e)=>{
 
@@ -227,9 +196,7 @@ reader.onload = (ev)=>{
 
 const data = JSON.parse(ev.target.result);
 
-data.forEach(d=>{
-    build(d);
-});
+data.forEach(d=>build(d));
 
 renderHierarchy();
 
@@ -238,6 +205,8 @@ renderHierarchy();
 reader.readAsText(file);
 
 };
+
+}
 
 /* =========================
    BUILD
@@ -269,8 +238,8 @@ const m = new THREE.Mesh(
     new THREE.MeshStandardMaterial({ color:0x00ffff })
 );
 
-m.position.copy(data.position);
-m.scale.copy(data.scale);
+m.position.copy(data.position || {x:0,y:0,z:0});
+m.scale.copy(data.scale || {x:1,y:1,z:1});
 
 scene.add(m);
 parts.push(m);
@@ -280,14 +249,16 @@ return m;
 }
 
 /* =========================
-   HIERARCHY UI
+   HIERARCHY
 ========================= */
 
 function renderHierarchy(){
 
+if(!hierarchy) return;
+
 hierarchy.innerHTML = "";
 
-groups.forEach((g)=>{
+groups.forEach(g=>{
 
 const div = document.createElement("div");
 div.className = "group";
@@ -308,7 +279,6 @@ child.appendChild(item);
 });
 
 div.appendChild(child);
-
 hierarchy.appendChild(div);
 
 });
@@ -316,13 +286,13 @@ hierarchy.appendChild(div);
 }
 
 /* =========================
-   INIT
+   INIT SAFE
 ========================= */
 
 export function initEditor(){
 
-addBtn.onclick = addPart;
-newGroupBtn.onclick = newGroup;
-endGroupBtn.onclick = endGroup;
+if(addBtn) addBtn.onclick = addPart;
+if(newGroupBtn) newGroupBtn.onclick = newGroup;
+if(endGroupBtn) endGroupBtn.onclick = endGroup;
 
 }
